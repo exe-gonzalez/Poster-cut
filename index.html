@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PosterCut — Divisor de Pósters A4</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body data-theme="dark">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">⬛</span>
+        <span class="logo-text">Poster<em>Cut</em></span>
+      </div>
+      <button class="theme-toggle" id="themeToggle" title="Cambiar tema">
+        <span class="theme-icon">☀️</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="app-main">
+
+    <!-- PASO 1: Upload -->
+    <section class="step-section" id="step-upload">
+      <div class="step-header">
+        <span class="step-number">01</span>
+        <h2>Cargá tu imagen</h2>
+      </div>
+
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden />
+        <div class="upload-content" id="uploadContent">
+          <div class="upload-icon">🖼️</div>
+          <p class="upload-title">Arrastrá tu imagen aquí</p>
+          <p class="upload-sub">o hacé click para seleccionar</p>
+          <p class="upload-hint">JPG, PNG, WEBP — Máximo 20 MB</p>
+          <button class="btn btn-outline" id="uploadBtn">Seleccionar archivo</button>
+        </div>
+        <div class="upload-preview hidden" id="uploadPreview">
+          <img id="previewImg" alt="Vista previa" />
+          <div class="preview-info" id="previewInfo"></div>
+          <button class="btn btn-ghost btn-sm" id="changeImageBtn">✕ Cambiar imagen</button>
+        </div>
+      </div>
+
+      <div class="validation-msg hidden" id="validationMsg"></div>
+    </section>
+
+    <!-- PASO 2: Configuración -->
+    <section class="step-section locked" id="step-config">
+      <div class="step-header">
+        <span class="step-number">02</span>
+        <h2>Configurá el póster</h2>
+      </div>
+
+      <div class="config-grid">
+
+        <!-- Formato -->
+        <div class="config-card">
+          <h3 class="config-label">Formato</h3>
+          <div class="format-selector" id="formatSelector">
+            <button class="format-btn active" data-cols="2" data-rows="1">
+              <div class="format-visual" data-cols="2" data-rows="1"></div>
+              <span>2×1</span>
+              <small>2 hojas</small>
+            </button>
+            <button class="format-btn" data-cols="2" data-rows="2">
+              <div class="format-visual" data-cols="2" data-rows="2"></div>
+              <span>2×2</span>
+              <small>4 hojas</small>
+            </button>
+            <button class="format-btn" data-cols="3" data-rows="3">
+              <div class="format-visual" data-cols="3" data-rows="3"></div>
+              <span>3×3</span>
+              <small>9 hojas</small>
+            </button>
+            <button class="format-btn" data-cols="4" data-rows="4">
+              <div class="format-visual" data-cols="4" data-rows="4"></div>
+              <span>4×4</span>
+              <small>16 hojas</small>
+            </button>
+          </div>
+        </div>
+
+        <!-- Modo de ajuste -->
+        <div class="config-card">
+          <h3 class="config-label">Modo de ajuste</h3>
+          <div class="toggle-group">
+            <button class="toggle-btn active" id="modeFit" data-mode="fit">
+              <span>⬜ Ajustar</span>
+              <small>Toda la imagen visible</small>
+            </button>
+            <button class="toggle-btn" id="modeCover" data-mode="cover">
+              <span>◼ Rellenar</span>
+              <small>Sin bordes blancos</small>
+            </button>
+          </div>
+        </div>
+
+        <!-- Orientación -->
+        <div class="config-card">
+          <h3 class="config-label">Orientación de hoja</h3>
+          <div class="toggle-group">
+            <button class="toggle-btn active" id="orientPortrait" data-orient="portrait">
+              <span>📄 Vertical</span>
+              <small>A4 Portrait</small>
+            </button>
+            <button class="toggle-btn" id="orientLandscape" data-orient="landscape">
+              <span>🗒️ Horizontal</span>
+              <small>A4 Landscape</small>
+            </button>
+          </div>
+        </div>
+
+        <!-- Opciones avanzadas -->
+        <div class="config-card config-card--full">
+          <h3 class="config-label">Opciones avanzadas</h3>
+          <div class="options-grid">
+
+            <label class="option-row">
+              <span class="option-label">
+                Superposición (overlap)
+                <small>px entre hojas para facilitar el pegado</small>
+              </span>
+              <div class="range-group">
+                <input type="range" id="overlapRange" min="0" max="40" value="0" step="5" />
+                <span class="range-val" id="overlapVal">0 px</span>
+              </div>
+            </label>
+
+            <label class="option-row">
+              <span class="option-label">
+                Márgenes de impresión
+                <small>mm en cada borde</small>
+              </span>
+              <div class="range-group">
+                <input type="range" id="marginRange" min="0" max="20" value="5" step="1" />
+                <span class="range-val" id="marginVal">5 mm</span>
+              </div>
+            </label>
+
+            <label class="option-row checkbox-row">
+              <input type="checkbox" id="showCutMarks" checked />
+              <span class="option-label">Mostrar marcas de corte</span>
+            </label>
+
+            <label class="option-row checkbox-row">
+              <input type="checkbox" id="showNumbers" checked />
+              <span class="option-label">Mostrar numeración de hojas</span>
+            </label>
+
+            <label class="option-row checkbox-row">
+              <input type="checkbox" id="autoOrient" checked />
+              <span class="option-label">Auto-detectar orientación</span>
+            </label>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Tamaño estimado -->
+      <div class="size-info" id="sizeInfo">
+        <div class="size-badge">
+          <span class="size-icon">📐</span>
+          <span id="sizeText">Tamaño estimado: —</span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-lg" id="generateBtn">
+        <span>Generar previsualización</span>
+        <span class="btn-arrow">→</span>
+      </button>
+    </section>
+
+    <!-- PASO 3: Previsualización -->
+    <section class="step-section locked hidden" id="step-preview">
+      <div class="step-header">
+        <span class="step-number">03</span>
+        <h2>Previsualización del póster</h2>
+      </div>
+
+      <div class="preview-grid-container">
+        <div class="poster-grid" id="posterGrid"></div>
+      </div>
+
+      <!-- Visor individual de hoja -->
+      <div class="sheet-viewer hidden" id="sheetViewer">
+        <div class="sheet-viewer-header">
+          <span id="sheetViewerTitle">Hoja 1/1</span>
+          <button class="btn btn-ghost btn-sm" id="closeViewer">✕ Cerrar</button>
+        </div>
+        <div class="sheet-viewer-canvas">
+          <canvas id="sheetCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Acciones -->
+      <div class="action-bar">
+        <button class="btn btn-outline" id="backBtn">← Volver</button>
+        <div class="action-group">
+          <button class="btn btn-secondary" id="downloadImagesBtn">
+            📥 Descargar imágenes
+          </button>
+          <button class="btn btn-primary" id="printPdfBtn">
+            🖨️ Imprimir / PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra de progreso PDF -->
+      <div class="progress-bar-wrap hidden" id="progressWrap">
+        <div class="progress-label" id="progressLabel">Generando PDF…</div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <p>PosterCut — todo funciona en tu navegador, sin servidor ✦ Hecho con Canvas API + jsPDF</p>
+  </footer>
+
+  <!-- Canvas oculto para procesamiento -->
+  <canvas id="processingCanvas" hidden></canvas>
+
+  <script src="app.js"></script>
+</body>
+</html>
