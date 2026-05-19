@@ -110,21 +110,8 @@ themeToggle.addEventListener('click', () => {
 });
 
 // ============================================================
-// CARGA DE ARCHIVO (imagen o PDF)
+// CARGA DE IMAGEN
 // ============================================================
-
-// PDF.js worker (CDN matching the version loaded in index.html)
-if (window.pdfjsLib) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-}
-
-// Estado PDF
-const pdfState = {
-  pdfDoc: null,
-  currentPage: 1,
-  totalPages: 0,
-};
 
 // Drag & drop
 uploadZone.addEventListener('dragover', e => {
@@ -140,6 +127,7 @@ uploadZone.addEventListener('drop', e => {
 });
 
 uploadZone.addEventListener('click', e => {
+  // Solo disparar si se hace click en la zona vacía o el botón
   if (e.target === uploadZone || e.target === uploadContent ||
       e.target.closest('#uploadContent')) {
     fileInput.click();
@@ -155,38 +143,32 @@ changeImageBtn.addEventListener('click', e => {
 });
 
 async function handleFile(file) {
-  const MAX_MB = 50;
-  const allowedImages = ['image/jpeg', 'image/png', 'image/webp'];
-  const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  // Validación
+  const MAX_MB = 20;
+  const allowed = ['image/jpeg','image/png','image/webp'];
 
-  if (!allowedImages.includes(file.type) && !isPDF) {
-    showValidation('Formato no soportado. Usá JPG, PNG, WEBP o PDF.', 'error');
+  if (!allowed.includes(file.type)) {
+    showValidation('Formato no soportado. Usá JPG, PNG o WEBP.', 'error');
     return;
   }
   if (file.size > MAX_MB * 1024 * 1024) {
-    showValidation(`El archivo supera los ${MAX_MB} MB.`, 'error');
+    showValidation(`La imagen supera los ${MAX_MB} MB. Usá una más liviana.`, 'error');
     return;
   }
   hideValidation();
 
-  state.imageFile   = file;
+  state.imageFile = file;
   state.rotationDeg = 0;
 
-  if (isPDF) {
-    await handlePDF(file);
-  } else {
-    await handleImage(file);
-  }
-}
-
-// ---- Imagen ----
-async function handleImage(file) {
+  // Mostrar preview
   const url = URL.createObjectURL(file);
   previewImg.src = url;
 
+  // Crear ImageBitmap
   try {
     state.imageBitmap = await createImageBitmap(file);
   } catch {
+    // Fallback con Image
     state.imageBitmap = await loadImageAsBitmap(url);
   }
   state.imageWidth  = state.imageBitmap.width;
@@ -198,131 +180,12 @@ async function handleImage(file) {
   uploadContent.classList.add('hidden');
   uploadPreview.classList.remove('hidden');
 
+  // Auto-orientación
   if (state.autoOrient) autoDetectOrientation();
+
   unlockStep(stepConfig);
   updateSizeEstimate();
 }
-
-// ---- PDF ----
-async function handlePDF(file) {
-  if (!window.pdfjsLib) {
-    showValidation('PDF.js no está disponible. Recargá la página.', 'error');
-    return;
-  }
-
-  showValidation('Cargando PDF…', 'success');
-
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    pdfState.pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    pdfState.totalPages   = pdfState.pdfDoc.numPages;
-    pdfState.currentPage  = 1;
-
-    hideValidation();
-
-    if (pdfState.totalPages === 1) {
-      // Un solo página: cargar directo sin selector
-      await loadPDFPage(pdfState.currentPage);
-    } else {
-      // Múltiples páginas: mostrar selector
-      showPDFSelector();
-    }
-  } catch (err) {
-    console.error(err);
-    showValidation('Error al leer el PDF: ' + err.message, 'error');
-  }
-}
-
-/**
- * Renderiza una página del PDF a un ImageBitmap y la carga como fuente.
- * @param {number} pageNum
- */
-async function loadPDFPage(pageNum) {
-  const page     = await pdfState.pdfDoc.getPage(pageNum);
-  const viewport = page.getViewport({ scale: 1 });
-
-  // Escalar a ~200 dpi (alta resolución para el procesamiento posterior)
-  // A4 tiene ~210mm de ancho = 8.27 pulgadas → 8.27 * 200 = ~1654 px
-  const targetWidth = 1654;
-  const scale = targetWidth / viewport.width;
-  const scaledViewport = page.getViewport({ scale });
-
-  const offscreen = document.createElement('canvas');
-  offscreen.width  = Math.round(scaledViewport.width);
-  offscreen.height = Math.round(scaledViewport.height);
-  const ctx = offscreen.getContext('2d');
-
-  await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
-
-  // Convertir canvas a ImageBitmap
-  state.imageBitmap = await createImageBitmap(offscreen);
-  state.imageWidth  = state.imageBitmap.width;
-  state.imageHeight = state.imageBitmap.height;
-
-  // Thumbnail para el preview de carga
-  const thumbCanvas = document.createElement('canvas');
-  const thumbH = 300;
-  const thumbW = Math.round(thumbH * (offscreen.width / offscreen.height));
-  thumbCanvas.width = thumbW;
-  thumbCanvas.height = thumbH;
-  thumbCanvas.getContext('2d').drawImage(offscreen, 0, 0, thumbW, thumbH);
-  previewImg.src = thumbCanvas.toDataURL();
-
-  previewInfo.textContent =
-    `PDF página ${pageNum}/${pdfState.totalPages} — ` +
-    `${state.imageWidth} × ${state.imageHeight} px — ${formatSize(state.imageFile.size)}`;
-
-  uploadContent.classList.add('hidden');
-  uploadPreview.classList.remove('hidden');
-  $('pdfPageSelector').classList.add('hidden');
-
-  if (state.autoOrient) autoDetectOrientation();
-  unlockStep(stepConfig);
-  updateSizeEstimate();
-}
-
-// ---- Selector visual de página PDF ----
-function showPDFSelector() {
-  const sel = $('pdfPageSelector');
-  $('pdfPageCount').textContent = `${pdfState.totalPages} páginas encontradas`;
-  sel.classList.remove('hidden');
-  uploadContent.classList.add('hidden');
-  renderPDFThumb(pdfState.currentPage);
-}
-
-async function renderPDFThumb(pageNum) {
-  $('pdfPageIndicator').textContent = `Página ${pageNum} de ${pdfState.totalPages}`;
-  $('pdfPrevBtn').disabled = pageNum <= 1;
-  $('pdfNextBtn').disabled = pageNum >= pdfState.totalPages;
-
-  const page     = await pdfState.pdfDoc.getPage(pageNum);
-  const viewport = page.getViewport({ scale: 1 });
-
-  const thumbCanvas = $('pdfThumbCanvas');
-  const maxW = Math.min(340, window.innerWidth - 80);
-  const scale = maxW / viewport.width;
-  const sv    = page.getViewport({ scale });
-
-  thumbCanvas.width  = Math.round(sv.width);
-  thumbCanvas.height = Math.round(sv.height);
-  await page.render({ canvasContext: thumbCanvas.getContext('2d'), viewport: sv }).promise;
-}
-
-$('pdfPrevBtn').addEventListener('click', () => {
-  if (pdfState.currentPage > 1) {
-    pdfState.currentPage--;
-    renderPDFThumb(pdfState.currentPage);
-  }
-});
-$('pdfNextBtn').addEventListener('click', () => {
-  if (pdfState.currentPage < pdfState.totalPages) {
-    pdfState.currentPage++;
-    renderPDFThumb(pdfState.currentPage);
-  }
-});
-$('pdfConfirmBtn').addEventListener('click', () => {
-  loadPDFPage(pdfState.currentPage);
-});
 
 function loadImageAsBitmap(src) {
   return new Promise((resolve, reject) => {
@@ -340,12 +203,7 @@ function resetImage() {
   previewImg.src     = '';
   uploadContent.classList.remove('hidden');
   uploadPreview.classList.add('hidden');
-  $('pdfPageSelector').classList.add('hidden');
   fileInput.value    = '';
-  // Reset PDF state
-  pdfState.pdfDoc      = null;
-  pdfState.currentPage = 1;
-  pdfState.totalPages  = 0;
   lockStep(stepConfig);
   lockHideStep(stepPreview);
   posterGrid.innerHTML = '';
