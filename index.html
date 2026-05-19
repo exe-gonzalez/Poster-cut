@@ -7,7 +7,9 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
-  <!-- jsPDF -->
+  <!-- PDF.js (para leer PDFs como fuente) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- jsPDF (para exportar el póster) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body data-theme="dark">
@@ -35,12 +37,12 @@
       </div>
 
       <div class="upload-zone" id="uploadZone">
-        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" hidden />
+        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,application/pdf" hidden />
         <div class="upload-content" id="uploadContent">
           <div class="upload-icon">🖼️</div>
           <p class="upload-title">Arrastrá tu imagen aquí</p>
           <p class="upload-sub">o hacé click para seleccionar</p>
-          <p class="upload-hint">JPG, PNG, WEBP — Máximo 20 MB</p>
+          <p class="upload-hint">JPG, PNG, WEBP, PDF — Máximo 50 MB</p>
           <button class="btn btn-outline" id="uploadBtn">Seleccionar archivo</button>
         </div>
         <div class="upload-preview hidden" id="uploadPreview">
@@ -51,7 +53,27 @@
       </div>
 
       <div class="validation-msg hidden" id="validationMsg"></div>
-    </section>
+
+      <!-- Selector de página para PDFs multipágina -->
+      <div class="pdf-page-selector hidden" id="pdfPageSelector">
+        <div class="pdf-page-header">
+          <span class="pdf-page-icon">📄</span>
+          <div>
+            <p class="pdf-page-title">PDF con múltiples páginas</p>
+            <p class="pdf-page-sub" id="pdfPageCount"></p>
+          </div>
+        </div>
+        <div class="pdf-page-controls">
+          <label class="config-label" style="margin-bottom:8px">Seleccionar página a usar como póster</label>
+          <div class="pdf-nav">
+            <button class="btn btn-outline btn-sm" id="pdfPrevBtn">← Anterior</button>
+            <span class="pdf-page-indicator" id="pdfPageIndicator">Página 1</span>
+            <button class="btn btn-outline btn-sm" id="pdfNextBtn">Siguiente →</button>
+          </div>
+          <canvas id="pdfThumbCanvas" class="pdf-thumb"></canvas>
+          <button class="btn btn-primary" id="pdfConfirmBtn">Usar esta página →</button>
+        </div>
+      </div>
 
     <!-- PASO 2: Configuración -->
     <section class="step-section locked" id="step-config">
