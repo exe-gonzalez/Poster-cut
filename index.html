@@ -82,141 +82,246 @@
         <h2>Configurá el póster</h2>
       </div>
 
-      <div class="config-grid">
-
-        <!-- Formato -->
-        <div class="config-card">
-          <h3 class="config-label">Formato</h3>
-          <div class="format-selector" id="formatSelector">
-            <button class="format-btn active" data-cols="2" data-rows="1">
-              <div class="format-visual" data-cols="2" data-rows="1"></div>
-              <span>2×1</span>
-              <small>2 hojas</small>
-            </button>
-            <button class="format-btn" data-cols="2" data-rows="2">
-              <div class="format-visual" data-cols="2" data-rows="2"></div>
-              <span>2×2</span>
-              <small>4 hojas</small>
-            </button>
-            <button class="format-btn" data-cols="3" data-rows="3">
-              <div class="format-visual" data-cols="3" data-rows="3"></div>
-              <span>3×3</span>
-              <small>9 hojas</small>
-            </button>
-            <button class="format-btn" data-cols="4" data-rows="4">
-              <div class="format-visual" data-cols="4" data-rows="4"></div>
-              <span>4×4</span>
-              <small>16 hojas</small>
-            </button>
-            <button class="format-btn" data-cols="5" data-rows="5">
-              <div class="format-visual format-visual--small" data-cols="5" data-rows="5"></div>
-              <span>5×5</span>
-              <small>25 hojas</small>
-            </button>
-            <button class="format-btn" data-cols="6" data-rows="6">
-              <div class="format-visual format-visual--small" data-cols="6" data-rows="6"></div>
-              <span>6×6</span>
-              <small>36 hojas</small>
-            </button>
-            <button class="format-btn" data-cols="7" data-rows="7">
-              <div class="format-visual format-visual--small" data-cols="7" data-rows="7"></div>
-              <span>7×7</span>
-              <small>49 hojas</small>
-            </button>
-            <button class="format-btn" data-cols="8" data-rows="8">
-              <div class="format-visual format-visual--small" data-cols="8" data-rows="8"></div>
-              <span>8×8</span>
-              <small>64 hojas</small>
-            </button>
-            <button class="format-btn" data-cols="9" data-rows="9">
-              <div class="format-visual format-visual--small" data-cols="9" data-rows="9"></div>
-              <span>9×9</span>
-              <small>81 hojas</small>
-            </button>
-            <button class="format-btn" data-cols="10" data-rows="10">
-              <div class="format-visual format-visual--small" data-cols="10" data-rows="10"></div>
-              <span>10×10</span>
-              <small>100 hojas</small>
-            </button>
-          </div>
-        </div>
-
-        <!-- Modo de ajuste -->
-        <div class="config-card">
-          <h3 class="config-label">Modo de ajuste</h3>
-          <div class="toggle-group">
-            <button class="toggle-btn active" id="modeFit" data-mode="fit">
-              <span>⬜ Ajustar</span>
-              <small>Toda la imagen visible</small>
-            </button>
-            <button class="toggle-btn" id="modeCover" data-mode="cover">
-              <span>◼ Rellenar</span>
-              <small>Sin bordes blancos</small>
-            </button>
-          </div>
-        </div>
-
-        <!-- Orientación -->
-        <div class="config-card">
-          <h3 class="config-label">Orientación de hoja</h3>
-          <div class="toggle-group">
-            <button class="toggle-btn active" id="orientPortrait" data-orient="portrait">
-              <span>📄 Vertical</span>
-              <small>A4 Portrait</small>
-            </button>
-            <button class="toggle-btn" id="orientLandscape" data-orient="landscape">
-              <span>🗒️ Horizontal</span>
-              <small>A4 Landscape</small>
-            </button>
-          </div>
-        </div>
-
-        <!-- Opciones avanzadas -->
-        <div class="config-card config-card--full">
-          <h3 class="config-label">Opciones avanzadas</h3>
-          <div class="options-grid">
-
-            <label class="option-row">
-              <span class="option-label">
-                Superposición (overlap)
-                <small>px entre hojas para facilitar el pegado</small>
-              </span>
-              <div class="range-group">
-                <input type="range" id="overlapRange" min="0" max="40" value="0" step="5" />
-                <span class="range-val" id="overlapVal">0 px</span>
-              </div>
-            </label>
-
-            <label class="option-row">
-              <span class="option-label">
-                Márgenes de impresión
-                <small>mm en cada borde</small>
-              </span>
-              <div class="range-group">
-                <input type="range" id="marginRange" min="0" max="20" value="5" step="1" />
-                <span class="range-val" id="marginVal">5 mm</span>
-              </div>
-            </label>
-
-            <label class="option-row checkbox-row">
-              <input type="checkbox" id="showCutMarks" checked />
-              <span class="option-label">Mostrar marcas de corte</span>
-            </label>
-
-            <label class="option-row checkbox-row">
-              <input type="checkbox" id="showNumbers" checked />
-              <span class="option-label">Mostrar numeración de hojas</span>
-            </label>
-
-            <label class="option-row checkbox-row">
-              <input type="checkbox" id="autoOrient" checked />
-              <span class="option-label">Auto-detectar orientación</span>
-            </label>
-
-          </div>
-        </div>
-
+      <!-- TABS: Póster / Tamaño Real -->
+      <div class="mode-tabs" id="modeTabs">
+        <button class="mode-tab active" id="tabPoster" data-tab="poster">
+          <span class="mode-tab-icon">🗂️</span>
+          <span class="mode-tab-title">Póster</span>
+          <small>Elegís cuántas hojas</small>
+        </button>
+        <button class="mode-tab" id="tabRealSize" data-tab="realsize">
+          <span class="mode-tab-icon">📐</span>
+          <span class="mode-tab-title">Tamaño real</span>
+          <small>Calculá por cm finales</small>
+        </button>
       </div>
+
+      <!-- ══════════ PANEL PÓSTER ══════════ -->
+      <div id="panelPoster">
+        <div class="config-grid">
+
+          <!-- Formato -->
+          <div class="config-card config-card--full">
+            <h3 class="config-label">Formato del póster</h3>
+            <div class="format-selector" id="formatSelector">
+              <button class="format-btn active" data-cols="2" data-rows="1">
+                <div class="format-visual" data-cols="2" data-rows="1"></div>
+                <span>2×1</span><small>2 hojas</small>
+              </button>
+              <button class="format-btn" data-cols="2" data-rows="2">
+                <div class="format-visual" data-cols="2" data-rows="2"></div>
+                <span>2×2</span><small>4 hojas</small>
+              </button>
+              <button class="format-btn" data-cols="3" data-rows="3">
+                <div class="format-visual" data-cols="3" data-rows="3"></div>
+                <span>3×3</span><small>9 hojas</small>
+              </button>
+              <button class="format-btn" data-cols="4" data-rows="4">
+                <div class="format-visual" data-cols="4" data-rows="4"></div>
+                <span>4×4</span><small>16 hojas</small>
+              </button>
+              <button class="format-btn" data-cols="5" data-rows="5">
+                <div class="format-visual format-visual--small" data-cols="5" data-rows="5"></div>
+                <span>5×5</span><small>25 hojas</small>
+              </button>
+              <button class="format-btn" data-cols="6" data-rows="6">
+                <div class="format-visual format-visual--small" data-cols="6" data-rows="6"></div>
+                <span>6×6</span><small>36 hojas</small>
+              </button>
+              <button class="format-btn" data-cols="7" data-rows="7">
+                <div class="format-visual format-visual--small" data-cols="7" data-rows="7"></div>
+                <span>7×7</span><small>49 hojas</small>
+              </button>
+              <button class="format-btn" data-cols="8" data-rows="8">
+                <div class="format-visual format-visual--small" data-cols="8" data-rows="8"></div>
+                <span>8×8</span><small>64 hojas</small>
+              </button>
+              <button class="format-btn" data-cols="9" data-rows="9">
+                <div class="format-visual format-visual--small" data-cols="9" data-rows="9"></div>
+                <span>9×9</span><small>81 hojas</small>
+              </button>
+              <button class="format-btn" data-cols="10" data-rows="10">
+                <div class="format-visual format-visual--small" data-cols="10" data-rows="10"></div>
+                <span>10×10</span><small>100 hojas</small>
+              </button>
+            </div>
+          </div>
+
+          <!-- Modo de ajuste -->
+          <div class="config-card">
+            <h3 class="config-label">Modo de ajuste</h3>
+            <div class="toggle-group">
+              <button class="toggle-btn active" id="modeFit" data-mode="fit">
+                <span>⬜ Ajustar</span>
+                <small>Toda la imagen visible</small>
+              </button>
+              <button class="toggle-btn" id="modeCover" data-mode="cover">
+                <span>◼ Rellenar</span>
+                <small>Sin bordes blancos</small>
+              </button>
+            </div>
+          </div>
+
+          <!-- Orientación -->
+          <div class="config-card">
+            <h3 class="config-label">Orientación de hoja</h3>
+            <div class="toggle-group">
+              <button class="toggle-btn active" id="orientPortrait" data-orient="portrait">
+                <span>📄 Vertical</span>
+                <small>A4 Portrait</small>
+              </button>
+              <button class="toggle-btn" id="orientLandscape" data-orient="landscape">
+                <span>🗒️ Horizontal</span>
+                <small>A4 Landscape</small>
+              </button>
+            </div>
+          </div>
+
+          <!-- Opciones avanzadas -->
+          <div class="config-card config-card--full">
+            <h3 class="config-label">Opciones avanzadas</h3>
+            <div class="options-grid">
+              <label class="option-row">
+                <span class="option-label">
+                  Superposición (overlap)
+                  <small>px entre hojas para facilitar el pegado</small>
+                </span>
+                <div class="range-group">
+                  <input type="range" id="overlapRange" min="0" max="40" value="0" step="5" />
+                  <span class="range-val" id="overlapVal">0 px</span>
+                </div>
+              </label>
+              <label class="option-row">
+                <span class="option-label">
+                  Márgenes de impresión
+                  <small>mm en cada borde</small>
+                </span>
+                <div class="range-group">
+                  <input type="range" id="marginRange" min="0" max="20" value="5" step="1" />
+                  <span class="range-val" id="marginVal">5 mm</span>
+                </div>
+              </label>
+              <label class="option-row checkbox-row">
+                <input type="checkbox" id="showCutMarks" checked />
+                <span class="option-label">Mostrar marcas de corte</span>
+              </label>
+              <label class="option-row checkbox-row">
+                <input type="checkbox" id="showNumbers" checked />
+                <span class="option-label">Mostrar numeración de hojas</span>
+              </label>
+              <label class="option-row checkbox-row">
+                <input type="checkbox" id="autoOrient" checked />
+                <span class="option-label">Auto-detectar orientación</span>
+              </label>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /panelPoster -->
+
+      <!-- ══════════ PANEL TAMAÑO REAL ══════════ -->
+      <div id="panelRealSize" class="hidden">
+        <div class="realsize-wrapper">
+
+          <!-- Inputs de tamaño -->
+          <div class="config-card realsize-card">
+            <h3 class="config-label">Tamaño final del póster</h3>
+            <div class="realsize-inputs">
+              <div class="realsize-field">
+                <label for="realW">Ancho</label>
+                <div class="realsize-input-wrap">
+                  <input type="number" id="realW" min="5" max="600" value="50" step="1" />
+                  <span class="unit-label">cm</span>
+                </div>
+              </div>
+              <div class="realsize-sep">×</div>
+              <div class="realsize-field">
+                <label for="realH">Alto</label>
+                <div class="realsize-input-wrap">
+                  <input type="number" id="realH" min="5" max="600" value="90" step="1" />
+                  <span class="unit-label">cm</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Orientación de hoja para tamaño real -->
+            <div style="margin-top:18px">
+              <h3 class="config-label" style="margin-bottom:10px">Orientación de hoja</h3>
+              <div class="toggle-group toggle-group--row">
+                <button class="toggle-btn active" id="rsOrientPortrait">
+                  <span>📄 Vertical</span><small>A4 Portrait</small>
+                </button>
+                <button class="toggle-btn" id="rsOrientLandscape">
+                  <span>🗒️ Horizontal</span><small>A4 Landscape</small>
+                </button>
+              </div>
+            </div>
+
+            <!-- Márgenes para tamaño real -->
+            <div style="margin-top:18px">
+              <h3 class="config-label" style="margin-bottom:10px">Márgenes de impresión</h3>
+              <div class="range-group">
+                <input type="range" id="rsMarginRange" min="0" max="20" value="5" step="1" />
+                <span class="range-val" id="rsMarginVal">5 mm</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resultado del cálculo -->
+          <div class="realsize-result-card hidden" id="rsResultCard">
+            <div class="rs-result-header">
+              <span class="rs-result-icon">✅</span>
+              <div>
+                <p class="rs-result-title">Configuración calculada</p>
+                <p class="rs-result-sub" id="rsResultSub"></p>
+              </div>
+            </div>
+            <div class="rs-stats-grid">
+              <div class="rs-stat">
+                <span class="rs-num" id="rsColsVal">—</span>
+                <span class="rs-label">columnas</span>
+              </div>
+              <div class="rs-stat">
+                <span class="rs-num" id="rsRowsVal">—</span>
+                <span class="rs-label">filas</span>
+              </div>
+              <div class="rs-stat">
+                <span class="rs-num" id="rsSheetsVal">—</span>
+                <span class="rs-label">hojas total</span>
+              </div>
+              <div class="rs-stat">
+                <span class="rs-num rs-num--sm" id="rsExactSize">—</span>
+                <span class="rs-label">tamaño exacto final</span>
+              </div>
+            </div>
+
+            <!-- Preview visual del póster con borde marcado -->
+            <div class="rs-preview-wrap">
+              <p class="config-label" style="margin-bottom:8px">Vista previa proporcional</p>
+              <div class="rs-poster-preview" id="rsPosterPreview">
+                <div class="rs-poster-inner" id="rsPosterInner">
+                  <div class="rs-poster-grid" id="rsPosterGrid"></div>
+                  <div class="rs-poster-border" id="rsPosterBorder"></div>
+                  <div class="rs-poster-label" id="rsPosterLabel"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Opciones extra para tamaño real -->
+            <div class="options-grid" style="margin-top:16px">
+              <label class="option-row checkbox-row">
+                <input type="checkbox" id="rsShowCutMarks" checked />
+                <span class="option-label">Mostrar marcas de corte</span>
+              </label>
+              <label class="option-row checkbox-row">
+                <input type="checkbox" id="rsShowNumbers" checked />
+                <span class="option-label">Mostrar numeración de hojas</span>
+              </label>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /panelRealSize -->
 
       <!-- Tamaño estimado -->
       <div class="size-info" id="sizeInfo">

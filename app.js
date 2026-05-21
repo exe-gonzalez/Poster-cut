@@ -11,21 +11,31 @@
 // ============================================================
 const state = {
   imageFile: null,
-  imageBitmap: null,          // ImageBitmap de la imagen original
+  imageBitmap: null,
   imageWidth: 0,
   imageHeight: 0,
   cols: 2,
   rows: 1,
   mode: 'fit',                // 'fit' | 'cover'
   orientation: 'portrait',   // 'portrait' | 'landscape'
-  overlap: 0,                 // px extra entre hojas (en espacio imagen)
-  margin: 5,                  // mm de margen de impresión
+  overlap: 0,
+  margin: 5,
   showCutMarks: true,
   showNumbers: true,
   autoOrient: true,
-  pageCanvases: [],           // canvases renderizados por hoja
+  pageCanvases: [],
   rotating: false,
   rotationDeg: 0,
+  // Modo de división
+  divisionMode: 'poster',     // 'poster' | 'realsize'
+  rsTargetWcm: 50,
+  rsTargetHcm: 90,
+  rsOrientation: 'portrait',
+  rsMargin: 5,
+  rsShowCutMarks: true,
+  rsShowNumbers: true,
+  rsCalcCols: 0,
+  rsCalcRows: 0,
 };
 
 // Dimensiones A4 en mm y puntos (72 dpi para jsPDF)
@@ -110,8 +120,21 @@ themeToggle.addEventListener('click', () => {
 });
 
 // ============================================================
-// CARGA DE IMAGEN
+// CARGA DE ARCHIVO (imagen o PDF)
 // ============================================================
+
+// PDF.js worker (CDN matching the version loaded in index.html)
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+// Estado PDF
+const pdfState = {
+  pdfDoc: null,
+  currentPage: 1,
+  totalPages: 0,
+};
 
 // Drag & drop
 uploadZone.addEventListener('dragover', e => {
@@ -127,7 +150,6 @@ uploadZone.addEventListener('drop', e => {
 });
 
 uploadZone.addEventListener('click', e => {
-  // Solo disparar si se hace click en la zona vacía o el botón
   if (e.target === uploadZone || e.target === uploadContent ||
       e.target.closest('#uploadContent')) {
     fileInput.click();
@@ -143,32 +165,38 @@ changeImageBtn.addEventListener('click', e => {
 });
 
 async function handleFile(file) {
-  // Validación
-  const MAX_MB = 20;
-  const allowed = ['image/jpeg','image/png','image/webp'];
+  const MAX_MB = 50;
+  const allowedImages = ['image/jpeg', 'image/png', 'image/webp'];
+  const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
-  if (!allowed.includes(file.type)) {
-    showValidation('Formato no soportado. Usá JPG, PNG o WEBP.', 'error');
+  if (!allowedImages.includes(file.type) && !isPDF) {
+    showValidation('Formato no soportado. Usá JPG, PNG, WEBP o PDF.', 'error');
     return;
   }
   if (file.size > MAX_MB * 1024 * 1024) {
-    showValidation(`La imagen supera los ${MAX_MB} MB. Usá una más liviana.`, 'error');
+    showValidation(`El archivo supera los ${MAX_MB} MB.`, 'error');
     return;
   }
   hideValidation();
 
-  state.imageFile = file;
+  state.imageFile   = file;
   state.rotationDeg = 0;
 
-  // Mostrar preview
+  if (isPDF) {
+    await handlePDF(file);
+  } else {
+    await handleImage(file);
+  }
+}
+
+// ---- Imagen ----
+async function handleImage(file) {
   const url = URL.createObjectURL(file);
   previewImg.src = url;
 
-  // Crear ImageBitmap
   try {
     state.imageBitmap = await createImageBitmap(file);
   } catch {
-    // Fallback con Image
     state.imageBitmap = await loadImageAsBitmap(url);
   }
   state.imageWidth  = state.imageBitmap.width;
@@ -180,12 +208,133 @@ async function handleFile(file) {
   uploadContent.classList.add('hidden');
   uploadPreview.classList.remove('hidden');
 
-  // Auto-orientación
   if (state.autoOrient) autoDetectOrientation();
+  unlockStep(stepConfig);
+  updateSizeEstimate();
+  // Si el panel real ya está activo, recalcular
+  if (state.divisionMode === 'realsize') calcRealSize();
+}
 
+// ---- PDF ----
+async function handlePDF(file) {
+  if (!window.pdfjsLib) {
+    showValidation('PDF.js no está disponible. Recargá la página.', 'error');
+    return;
+  }
+
+  showValidation('Cargando PDF…', 'success');
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    pdfState.pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    pdfState.totalPages   = pdfState.pdfDoc.numPages;
+    pdfState.currentPage  = 1;
+
+    hideValidation();
+
+    if (pdfState.totalPages === 1) {
+      // Un solo página: cargar directo sin selector
+      await loadPDFPage(pdfState.currentPage);
+    } else {
+      // Múltiples páginas: mostrar selector
+      showPDFSelector();
+    }
+  } catch (err) {
+    console.error(err);
+    showValidation('Error al leer el PDF: ' + err.message, 'error');
+  }
+}
+
+/**
+ * Renderiza una página del PDF a un ImageBitmap y la carga como fuente.
+ * @param {number} pageNum
+ */
+async function loadPDFPage(pageNum) {
+  const page     = await pdfState.pdfDoc.getPage(pageNum);
+  const viewport = page.getViewport({ scale: 1 });
+
+  // Escalar a ~200 dpi (alta resolución para el procesamiento posterior)
+  // A4 tiene ~210mm de ancho = 8.27 pulgadas → 8.27 * 200 = ~1654 px
+  const targetWidth = 1654;
+  const scale = targetWidth / viewport.width;
+  const scaledViewport = page.getViewport({ scale });
+
+  const offscreen = document.createElement('canvas');
+  offscreen.width  = Math.round(scaledViewport.width);
+  offscreen.height = Math.round(scaledViewport.height);
+  const ctx = offscreen.getContext('2d');
+
+  await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+
+  // Convertir canvas a ImageBitmap
+  state.imageBitmap = await createImageBitmap(offscreen);
+  state.imageWidth  = state.imageBitmap.width;
+  state.imageHeight = state.imageBitmap.height;
+
+  // Thumbnail para el preview de carga
+  const thumbCanvas = document.createElement('canvas');
+  const thumbH = 300;
+  const thumbW = Math.round(thumbH * (offscreen.width / offscreen.height));
+  thumbCanvas.width = thumbW;
+  thumbCanvas.height = thumbH;
+  thumbCanvas.getContext('2d').drawImage(offscreen, 0, 0, thumbW, thumbH);
+  previewImg.src = thumbCanvas.toDataURL();
+
+  previewInfo.textContent =
+    `PDF página ${pageNum}/${pdfState.totalPages} — ` +
+    `${state.imageWidth} × ${state.imageHeight} px — ${formatSize(state.imageFile.size)}`;
+
+  uploadContent.classList.add('hidden');
+  uploadPreview.classList.remove('hidden');
+  $('pdfPageSelector').classList.add('hidden');
+
+  if (state.autoOrient) autoDetectOrientation();
   unlockStep(stepConfig);
   updateSizeEstimate();
 }
+
+// ---- Selector visual de página PDF ----
+function showPDFSelector() {
+  const sel = $('pdfPageSelector');
+  $('pdfPageCount').textContent = `${pdfState.totalPages} páginas encontradas`;
+  sel.classList.remove('hidden');
+  uploadContent.classList.add('hidden');
+  renderPDFThumb(pdfState.currentPage);
+}
+
+async function renderPDFThumb(pageNum) {
+  $('pdfPageIndicator').textContent = `Página ${pageNum} de ${pdfState.totalPages}`;
+  $('pdfPrevBtn').disabled = pageNum <= 1;
+  $('pdfNextBtn').disabled = pageNum >= pdfState.totalPages;
+
+  const page     = await pdfState.pdfDoc.getPage(pageNum);
+  const viewport = page.getViewport({ scale: 1 });
+
+  const thumbCanvas = $('pdfThumbCanvas');
+  const maxW = Math.min(340, window.innerWidth - 80);
+  const scale = maxW / viewport.width;
+  const sv    = page.getViewport({ scale });
+
+  thumbCanvas.width  = Math.round(sv.width);
+  thumbCanvas.height = Math.round(sv.height);
+  await page.render({ canvasContext: thumbCanvas.getContext('2d'), viewport: sv }).promise;
+}
+
+$('pdfPrevBtn').addEventListener('click', () => {
+  if (pdfState.currentPage > 1) {
+    pdfState.currentPage--;
+    renderPDFThumb(pdfState.currentPage);
+  }
+});
+$('pdfNextBtn').addEventListener('click', () => {
+  if (pdfState.currentPage < pdfState.totalPages) {
+    pdfState.currentPage++;
+    renderPDFThumb(pdfState.currentPage);
+  }
+});
+$('pdfConfirmBtn').addEventListener('click', () => {
+  loadPDFPage(pdfState.currentPage);
+});
 
 function loadImageAsBitmap(src) {
   return new Promise((resolve, reject) => {
@@ -203,7 +352,12 @@ function resetImage() {
   previewImg.src     = '';
   uploadContent.classList.remove('hidden');
   uploadPreview.classList.add('hidden');
+  $('pdfPageSelector').classList.add('hidden');
   fileInput.value    = '';
+  // Reset PDF state
+  pdfState.pdfDoc      = null;
+  pdfState.currentPage = 1;
+  pdfState.totalPages  = 0;
   lockStep(stepConfig);
   lockHideStep(stepPreview);
   posterGrid.innerHTML = '';
@@ -283,6 +437,10 @@ function setActiveToggle(active, group) {
 
 function updateSizeEstimate() {
   if (!state.imageBitmap) return;
+  if (state.divisionMode === 'realsize') {
+    calcRealSize();
+    return;
+  }
   const page = A4[state.orientation];
   const wCM  = (page.wMM / 10) * state.cols;
   const hCM  = (page.hMM / 10) * state.rows;
@@ -298,10 +456,26 @@ generateBtn.addEventListener('click', generatePreview);
 async function generatePreview() {
   if (!state.imageBitmap) return;
 
+  // En modo tamaño real: validar que se haya calculado
+  if (state.divisionMode === 'realsize') {
+    calcRealSize(); // recalcular con valores actuales
+    if (state.rsCalcCols === 0) {
+      showValidation('Ingresá las dimensiones deseadas primero.', 'error');
+      return;
+    }
+    // Sincronizar cols/rows y parámetros al state principal para renderAllPages
+    state.cols         = state.rsCalcCols;
+    state.rows         = state.rsCalcRows;
+    state.orientation  = state.rsOrientation;
+    state.margin       = state.rsMargin;
+    state.mode         = 'cover';   // tamaño real siempre es cover exacto
+    state.showCutMarks = state.rsShowCutMarks;
+    state.showNumbers  = state.rsShowNumbers;
+    state.overlap      = 0;
+  }
+
   generateBtn.disabled = true;
   generateBtn.querySelector('span').textContent = 'Generando…';
-
-  // Pequeño delay para que la UI actualice
   await new Promise(r => setTimeout(r, 50));
 
   try {
@@ -778,6 +952,205 @@ function rotateImage() {
     previewImg.src = tmp.toDataURL();
   }
   updateSizeEstimate();
+}
+
+// ============================================================
+// MODO TABS — PÓSTER / TAMAÑO REAL
+// ============================================================
+
+const tabPoster     = $('tabPoster');
+const tabRealSize   = $('tabRealSize');
+const panelPoster   = $('panelPoster');
+const panelRealSize = $('panelRealSize');
+
+tabPoster.addEventListener('click', () => switchDivisionMode('poster'));
+tabRealSize.addEventListener('click', () => switchDivisionMode('realsize'));
+
+function switchDivisionMode(mode) {
+  state.divisionMode = mode;
+  if (mode === 'poster') {
+    tabPoster.classList.add('active');
+    tabRealSize.classList.remove('active');
+    panelPoster.classList.remove('hidden');
+    panelRealSize.classList.add('hidden');
+    updateSizeEstimate();
+  } else {
+    tabRealSize.classList.add('active');
+    tabPoster.classList.remove('active');
+    panelRealSize.classList.remove('hidden');
+    panelPoster.classList.add('hidden');
+    // Calcular automáticamente al cambiar al panel
+    if (state.imageBitmap) calcRealSize();
+  }
+}
+
+// ============================================================
+// TAMAÑO REAL — Lógica de cálculo
+// ============================================================
+
+// DOM refs modo real
+const realWInput       = $('realW');
+const realHInput       = $('realH');
+const rsOrientPortrait = $('rsOrientPortrait');
+const rsOrientLandscape= $('rsOrientLandscape');
+const rsMarginRange    = $('rsMarginRange');
+const rsMarginVal      = $('rsMarginVal');
+const rsResultCard     = $('rsResultCard');
+const rsShowCutMarksEl = $('rsShowCutMarks');
+const rsShowNumbersEl  = $('rsShowNumbers');
+
+// Listeners del panel real
+realWInput.addEventListener('input', () => {
+  state.rsTargetWcm = parseFloat(realWInput.value) || 50;
+  if (state.imageBitmap) calcRealSize();
+});
+realHInput.addEventListener('input', () => {
+  state.rsTargetHcm = parseFloat(realHInput.value) || 90;
+  if (state.imageBitmap) calcRealSize();
+});
+
+rsOrientPortrait.addEventListener('click', () => {
+  state.rsOrientation = 'portrait';
+  setActiveToggle(rsOrientPortrait, [rsOrientPortrait, rsOrientLandscape]);
+  if (state.imageBitmap) calcRealSize();
+});
+rsOrientLandscape.addEventListener('click', () => {
+  state.rsOrientation = 'landscape';
+  setActiveToggle(rsOrientLandscape, [rsOrientPortrait, rsOrientLandscape]);
+  if (state.imageBitmap) calcRealSize();
+});
+
+rsMarginRange.addEventListener('input', () => {
+  state.rsMargin = parseInt(rsMarginRange.value);
+  rsMarginVal.textContent = state.rsMargin + ' mm';
+  if (state.imageBitmap) calcRealSize();
+});
+
+rsShowCutMarksEl.addEventListener('change', () => { state.rsShowCutMarks = rsShowCutMarksEl.checked; });
+rsShowNumbersEl.addEventListener('change',  () => { state.rsShowNumbers  = rsShowNumbersEl.checked; });
+
+/**
+ * Calcula cols y rows para que la imagen quede al tamaño físico pedido.
+ *
+ * Lógica:
+ *   - Área útil por hoja = (A4 - márgenes×2) en mm
+ *   - cols = ceil(targetW_mm / usefulW_mm)
+ *   - rows = ceil(targetH_mm / usefulH_mm)
+ *   - Tamaño real final = cols × usefulW  ×  rows × usefulH   (siempre >= al pedido)
+ */
+function calcRealSize() {
+  const page     = A4[state.rsOrientation];
+  const marginMM = state.rsMargin;
+  const usefulW  = page.wMM - marginMM * 2;  // mm útiles por hoja (ancho)
+  const usefulH  = page.hMM - marginMM * 2;  // mm útiles por hoja (alto)
+
+  const targetWmm = state.rsTargetWcm * 10;
+  const targetHmm = state.rsTargetHcm * 10;
+
+  const cols = Math.max(1, Math.ceil(targetWmm / usefulW));
+  const rows = Math.max(1, Math.ceil(targetHmm / usefulH));
+
+  // Tamaño real que quedará (siempre >= al pedido por el ceil)
+  const realWmm = cols * usefulW;
+  const realHmm = rows * usefulH;
+  const realWcm = (realWmm / 10).toFixed(1);
+  const realHcm = (realHmm / 10).toFixed(1);
+
+  // Cuánto sobra respecto al pedido
+  const extraW = (realWmm - targetWmm).toFixed(0);
+  const extraH = (realHmm - targetHmm).toFixed(0);
+
+  state.rsCalcCols = cols;
+  state.rsCalcRows = rows;
+
+  // Actualizar DOM del resultado
+  $('rsColsVal').textContent   = cols;
+  $('rsRowsVal').textContent   = rows;
+  $('rsSheetsVal').textContent = cols * rows;
+  $('rsExactSize').textContent = `${realWcm} × ${realHcm} cm`;
+
+  let subText = `${cols} col × ${rows} fil — ${cols * rows} hojas A4`;
+  if (parseFloat(extraW) > 0 || parseFloat(extraH) > 0) {
+    subText += ` · Se recortarán ${extraW} mm a lo ancho y ${extraH} mm a lo alto`;
+  }
+  $('rsResultSub').textContent = subText;
+
+  // Mostrar el card
+  rsResultCard.classList.remove('hidden');
+
+  // Actualizar badge de tamaño
+  sizeText.textContent = `Tamaño final del póster: ${realWcm} × ${realHcm} cm · ${cols * rows} hojas`;
+
+  // Dibujar preview visual
+  drawRealSizePreview(cols, rows, realWcm, realHcm, targetWmm, targetHmm, realWmm, realHmm);
+}
+
+/**
+ * Dibuja el preview proporcional del póster con:
+ *  - fondo con la imagen (si hay)
+ *  - líneas punteadas de cada hoja A4
+ *  - borde de acento marcando el tamaño exacto pedido
+ *  - etiqueta con las dimensiones
+ */
+function drawRealSizePreview(cols, rows, realWcm, realHcm, targetWmm, targetHmm, realWmm, realHmm) {
+  const MAX_W = Math.min(480, window.innerWidth - 80);
+  const MAX_H = 280;
+
+  const aspect = realWmm / realHmm;
+  let dispW, dispH;
+  if (aspect >= MAX_W / MAX_H) {
+    dispW = MAX_W;
+    dispH = Math.round(MAX_W / aspect);
+  } else {
+    dispH = MAX_H;
+    dispW = Math.round(MAX_H * aspect);
+  }
+
+  const inner = $('rsPosterInner');
+  inner.style.width  = dispW + 'px';
+  inner.style.height = dispH + 'px';
+
+  // Imagen de fondo
+  let bg = inner.querySelector('.rs-poster-bg');
+  if (!bg) {
+    bg = document.createElement('div');
+    bg.className = 'rs-poster-bg';
+    inner.insertBefore(bg, inner.firstChild);
+  }
+  if (state.imageBitmap) {
+    // Usar el thumbnail del preview
+    bg.style.backgroundImage = `url(${previewImg.src})`;
+    bg.style.opacity = '0.55';
+  }
+
+  // Grilla de hojas
+  const grid = $('rsPosterGrid');
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  grid.style.gridTemplateRows    = `repeat(${rows}, 1fr)`;
+  grid.innerHTML = '';
+  for (let i = 0; i < cols * rows; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'rs-grid-cell';
+    grid.appendChild(cell);
+  }
+
+  // Borde que marca el tamaño real pedido (proporcional)
+  const borderW = Math.round((targetWmm / realWmm) * dispW);
+  const borderH = Math.round((targetHmm / realHmm) * dispH);
+  const borderL = Math.round((dispW - borderW) / 2);
+  const borderT = Math.round((dispH - borderH) / 2);
+
+  const border = $('rsPosterBorder');
+  border.style.width  = borderW + 'px';
+  border.style.height = borderH + 'px';
+  border.style.left   = borderL + 'px';
+  border.style.top    = borderT + 'px';
+
+  // Etiqueta encima del borde
+  const lbl = $('rsPosterLabel');
+  lbl.textContent = `${state.rsTargetWcm} × ${state.rsTargetHcm} cm`;
+  lbl.style.left = borderL + 'px';
+  lbl.style.top  = Math.max(0, borderT - 22) + 'px';
 }
 
 // ============================================================
